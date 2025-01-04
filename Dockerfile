@@ -1,7 +1,14 @@
 FROM ubuntu
 
 WORKDIR /app
+
+#Added to fix bug not allowing the docker image to be built
+RUN apt-get -y update && apt-get -y install redis mysql-server libmysqlclient-dev python3-pip
+
 COPY . .
+
+#Added to fix bug not allowing the docker image to be built
+RUN rm -rf /usr/lib/python3.*/EXTERNALLY-MANAGED && pip3 install --upgrade setuptools && pip3 install -r requirements_dev.txt --upgrade
 
 ENV DEBIAN_FRONTEND="noninteractive" TZ="Africa/Johannesburg"
 

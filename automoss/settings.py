@@ -215,12 +215,12 @@ with capture_in(LANGUAGE_CONTEXT):
         'JS': ('Javascript', 'javascript', ['js'], 'javascript'),  # cjs, mjs
         'PL': ('Perl', 'perl', ['pl', 'plx', 'pm', 'xs', 't', 'pod'], 'perl'),
         'MP': ('MIPS assembly', 'mips', ['asm', 's'], 'x86asm'),
+        'MB': ('Matlab', 'matlab', ['m'], 'matlab'),
 
         # TODO decide which to add, and add extensions
         # 'LP' : ('Lisp', 'lisp', []),
         # 'HS' : ('Haskell', 'haskell', []),
         # 'VB' : ('Visual Basic', 'vb', []),
-        # 'MB' : ('Matlab', 'matlab', []),
         # 'AA' : ('a8086 assembly', 'a8086', []),
         # 'VL' : ('Verilog', 'verilog', []),
         # 'PS' : ('Pascal', 'pascal', []),

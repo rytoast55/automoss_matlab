@@ -440,7 +440,11 @@ createJobForm.onsubmit = async (e) => {
 					}, 200);
 
 				}else if (this.status === 400){ // Server returns an error message regarding the submission.
-					displayError(xhr.response.message);
+					try {
+						displayError(xhr.response.message);
+					} catch (error) {
+						displayError("An error occurred.");
+					}
 					jobDropZone.resetProgress();
 					setEnabled(true);
 				}

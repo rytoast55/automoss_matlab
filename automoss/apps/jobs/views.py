@@ -14,6 +14,8 @@ from django.utils.timezone import now
 
 from .tasks import process_job
 
+from ..results.models import MOSSResult
+
 from .models import (
     Job,
     Submission,
@@ -143,9 +145,9 @@ class New(View):
                     fp.write(f.read())
 
         JobEvent.objects.create(
-            job=new_job, type=INQUEUE_EVENT, message='Placed in the processing queue')
+            job=new_job, type=INQUEUE_EVENT, message=f'Placed in the processing queue')
 
-        process_job.delay(job_id)
+        process_job.delay(job_id, request.POST.get('job-url'))
 
         data = json.loads(serialize('json', [new_job]))[0]['fields']
         return JsonResponse(data, status=200, safe=False)
@@ -215,6 +217,8 @@ class Retry(View):
 
     def post(self, request):
         """ Retry a user's job """
+
+        
         job_id = json.loads(request.body.decode("UTF-8")).get('job_id')
 
         try:

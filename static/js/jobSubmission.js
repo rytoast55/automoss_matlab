@@ -404,7 +404,7 @@ createJobForm.onsubmit = async (e) => {
 		// Submit the job (must use XMLHttpRequest to receive callbacks about upload progress).
 		let xhr = new XMLHttpRequest();
 		xhr.responseType = 'json';
-		xhr.open('POST', NEW_JOB_URL);
+		xhr.open('POST', RETRY_JOB_URL);
 
 		// https://developer.mozilla.org/en-US/docs/Web/API/XMLHttpRequest/upload
 		// Other events: error, abort, timeout
@@ -441,9 +441,9 @@ createJobForm.onsubmit = async (e) => {
 
 				}else if (this.status === 400){ // Server returns an error message regarding the submission.
 					try {
-						displayError(xhr.response.message);
+						displayError(xhr.response);
 					} catch (error) {
-						displayError("An error occurred.");
+						displayError(error);
 					}
 					jobDropZone.resetProgress();
 					setEnabled(true);

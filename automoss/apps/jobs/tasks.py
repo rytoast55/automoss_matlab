@@ -1,4 +1,3 @@
-
 from ..results.models import MOSSResult, Match
 from .models import Job, Submission, JobEvent
 from django.utils.timezone import now
@@ -76,7 +75,7 @@ def send_email_notification(job):
 
 
 @app.task(name='Upload')
-def process_job(job_id):
+def process_job(job_id, old_url):
     """Process a job, given its ID"""
 
     try:
@@ -158,24 +157,27 @@ def process_job(job_id):
                     JobEvent.objects.create(
                         job=job, type=PROCESSING_EVENT, message='MOSS finished processing')
 
-                url = MOSS.generate_url(
-                    user_id=job.user.moss_id,
-                    language=SUPPORTED_LANGUAGES[job.language][1],
-                    **paths,
-                    max_until_ignored=job.max_until_ignored,
-                    max_displayed_matches=job.max_displayed_matches,
-                    use_basename=True,
+                if is_valid_moss_url(old_url):
+                    url = old_url
+                else:
+                    url = MOSS.generate_url(
+                        user_id=job.user.moss_id,
+                        language=SUPPORTED_LANGUAGES[job.language][1],
+                        **paths,
+                        max_until_ignored=job.max_until_ignored,
+                        max_displayed_matches=job.max_displayed_matches,
+                        use_basename=True,
 
-                    # TODO other events to log?
-                    # on_start=None,
-                    # on_connect=None,
+                        # TODO other events to log?
+                        # on_start=None,
+                        # on_connect=None,
 
-                    on_upload_start=on_upload_start,
-                    on_upload_finish=on_upload_finish,
+                        on_upload_start=on_upload_start,
+                        on_upload_finish=on_upload_finish,
 
-                    on_processing_start=on_processing_start,
-                    on_processing_finish=on_processing_finish,
-                )
+                        on_processing_start=on_processing_start,
+                        on_processing_finish=on_processing_finish,
+                    )
 
             msg = f'Started parsing MOSS report: {url}'
             logger.info(msg)
@@ -275,6 +277,7 @@ def process_job(job_id):
         )
 
         for match in result.matches:
+            
             first_submission = Submission.objects.filter(
                 job=job, submission_id=match.name_1).first()
             second_submission = Submission.objects.filter(
@@ -291,6 +294,23 @@ def process_job(job_id):
                     lines_matched=match.lines_matched,
                     line_matches=match.line_matches
                 )
+            else:
+                first_submission = Submission.objects.filter(
+                    job=job, name=match.name_1).first()
+                second_submission = Submission.objects.filter(
+                    job=job, name=match.name_2).first()
+                if first_submission and second_submission:
+                    Match.objects.create(
+                        moss_result=moss_result,
+                        first_submission=first_submission,
+                        second_submission=second_submission,
+                        first_percentage=match.percentage_1,
+                        second_percentage=match.percentage_2,
+                        lines_matched=match.lines_matched,
+                        line_matches=match.line_matches
+                    )
+                else:
+                    JobEvent.objects.create(job=job, type=COMPLETED_EVENT,message=f'missing submission for {match.name_1} or {match.name_2}')
 
         JobEvent.objects.create(
             job=job, type=COMPLETED_EVENT, message='Completed')

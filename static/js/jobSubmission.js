@@ -280,6 +280,19 @@ let jobMaxMatchesDisplayed = document.getElementById("job-max-displayed-matches"
 let jobAttachBaseFiles = document.getElementById("job-attach-base-files");
 let jobMessage = document.getElementById("job-message");
 let createJobButton = document.getElementById("create-job-button");
+
+let generateReportModalElement = document.getElementById("generate-report-modal");
+let generateReportModal = new bootstrap.Modal(generateReportModalElement);
+let generateReportForm = document.getElementById("generate-report-form");
+let reportDropZone = document.getElementById("report-drop-zone");
+let reportName = document.getElementById("report-name");
+let reportLanguage = document.getElementById("report-language");
+let reportMaxMatchesUntilIgnored = document.getElementById("report-max-until-ignored");
+let reportMaxMatchesDisplayed = document.getElementById("report-max-displayed-matches");
+let reportAttachBaseFiles = document.getElementById("report-attach-base-files");
+let reportMessage = document.getElementById("report-message");
+let generateReportButton = document.getElementById("generate-report-button");
+
 let sizeExceededModalElement = document.getElementById("size-exceeded-modal");
 let sizeExceededModal = new bootstrap.Modal(sizeExceededModalElement);
 
@@ -540,6 +553,199 @@ jobDropZone.onFileRemoved = () => {
 };
 
 jobDropZone.onFileRejected = (reason) => {
+	displayError(reason);
+	
+	setTimeout(() => {
+		if (reason.startsWith("File size exceeds")){
+			sizeExceededModal.show();
+		}
+	}, 1000)
+}
+
+
+generateReportForm.onsubmit = async (e) => {
+	e.preventDefault(); // Prevent the modal from closing immediately.
+	
+	try {
+		// Create a new form (and capture name, language, max matches until ignored and max matches displayed)
+		let reportFormData = new FormData(generateReportForm);
+		setEnabled(false);
+		setMessage("Stitching...", "white");
+
+		// Capture files separately and append to form.
+		function appendFilesToForm(name, data, isBaseFile) {
+			reportFormData.append(isBaseFile ? BASE_FILES_NAME : FILES_NAME, new Blob([data]), name);
+		}
+
+		let numStudents = 0;
+		for (let reportDropZoneFile of reportDropZone.files) {
+			let archive = reportDropZone.file;
+			let languageId = reportLanguage.options[reportLanguage.selectedIndex].getAttribute("language-id");
+			let isBaseFile = reportDropZoneFile.isBaseFile;
+			let files = await extractFiles(archive, languageId);
+			if (await isSingleSubmission(files, languageId) || isBaseFile) {
+				appendFilesToForm(archive.name, await extractSingle(files, languageId), isBaseFile);
+				if (!isBaseFile) {
+					numStudents++;
+				}
+			} else {
+				let counter = 0;
+				await extractBatch(files, languageId, (name, data) => {
+					appendFilesToForm(name, data, false);
+					reportDropZoneFile.setProgress(++counter / files.length);
+				});
+				numStudents += counter;
+			}
+			reportDropZoneFile.setProgress(1);
+		}
+
+		// Check if there are at least 2 students.
+		if(numStudents <= 1){
+			displayError("Must include at least 2 students.");
+			reportDropZone.resetProgress();
+			setEnabled(true);
+			return;
+		}
+
+		// Submit the job (must use XMLHttpRequest to receive callbacks about upload progress).
+		let xhr = new XMLHttpRequest();
+		xhr.responseType = 'json';
+		xhr.open('POST', NEW_JOB_URL);
+
+		// https://developer.mozilla.org/en-US/docs/Web/API/XMLHttpRequest/upload
+		// Other events: error, abort, timeout
+
+		xhr.upload.addEventListener('loadstart', e => {
+			setMessage("Uploading (0%)", "white");
+		});
+		xhr.upload.addEventListener('progress', e => {
+			let percentage = e.lengthComputable ? (e.loaded / e.total) * 100 : 0;
+			setMessage(`Uploading (${percentage.toFixed(0)}%)`, "white");
+		});
+		// Done uploading, now server is processing upload (writing files to disk).
+		xhr.upload.addEventListener('load', e => {
+			setMessage("Waiting for server...", "white");
+		});
+		xhr.onreadystatechange = function (){ // Call a function when the state changes.
+			if (this.readyState === XMLHttpRequest.DONE){
+				if (this.status === 200){
+
+					// Obtain job as json data and add to the jobs table.
+					let json = xhr.response;
+					addJob(json, true);
+					unfinishedJobs.push(json["job_id"]);
+
+					// Hide and reset the form and dropzone.
+					generateReportModal.hide();
+					setTimeout(() => { // Timeout to ensure that the modal only clears once closed.
+						generateReportForm.reset();
+						reportDropZone.reset();
+						updateForBaseFiles();
+						setEnabled(true);
+						setMessage("", "white");
+					}, 200);
+
+				}else if (this.status === 400){ // Server returns an error message regarding the submission.
+					try {
+						displayError(xhr.response.message);
+					} catch (error) {
+						displayError("An error occurred.");
+					}
+					reportDropZone.resetProgress();
+					setEnabled(true);
+				}
+			}
+		}
+		xhr.send(reportFormData);
+
+	}catch(err){ // Unknown client-side error.
+		console.error(err);
+		displayError("An error occurred.");
+		reportDropZone.resetProgress();
+		setEnabled(true);
+	}
+};
+
+reportDropZone.onFileAdded = async (reportDropZoneFile) => {
+	generateReportButton.disabled = true;
+
+	let archive = reportDropZoneFile.file;
+	let files = await extractFiles(archive);
+
+	/**
+	 * Get the extension name of a file.
+	 */
+	function getExtension(name) {
+		return name.split(".").pop();
+	}
+
+	/**
+	 * Quickly determine the most likely programming language for a collection of files.
+	 */
+	function getProgrammingLanguageId(files) {
+		let d = {};
+		for (let key in SUPPORTED_LANGUAGES) {
+			d[key] = 0;
+		}
+		for (let file of files) {
+			let extension = getExtension(file.name);
+			for (let key in SUPPORTED_LANGUAGES) {
+				if (SUPPORTED_LANGUAGES[key][2].includes(extension)) {
+					d[key] += 1;
+				}
+			}
+		}
+		return Object.entries(d).reduce((a, b) => a[1] > b[1] ? a : b)[0]
+	}
+
+	// Type
+	let isSingle = await isSingleSubmission(files);
+
+	// Programming Language
+	let langTestFiles = [...files];
+	if (!isSingle) {
+		let counter = 0;
+		let maxArchives = 3;
+		for (let file of files) {
+			if (isArchive(file.name)) {
+				let tmpArchive = await extractFiles(file);
+				for (let tmpFile of tmpArchive) {
+					langTestFiles.push(tmpFile);
+				}
+				counter++;
+			}
+			if (counter > maxArchives) break; // Stops checking after max archives.
+		}
+	}
+	let languageId = getProgrammingLanguageId(langTestFiles);
+	let language = SUPPORTED_LANGUAGES[languageId][0];
+
+	// Tags
+	if (reportAttachBaseFiles.checked) {
+		reportDropZoneFile.addTag("Base", "var(--bs-dark)");
+		reportDropZoneFile.isBaseFile = true;
+	} else {
+		reportDropZoneFile.addTag(isSingle ? "Single" : `Batch (${countStudentsInBatch(files)})`, "var(--bs-dark)");
+	}
+
+	if (reportDropZone.files.length >= 1) {
+		reportName.value = reportName.value || trimRight(archive.name, getExtension(archive.name).length + 1);
+		reportLanguage.value = language;
+	}
+	generateReportButton.disabled = false;
+};
+
+reportDropZone.onFileRemoved = () => {
+	if (reportDropZone.files.length == 0) {
+		reportName.value = "";
+		reportLanguage.selectedIndex = 0;
+		reportMaxMatchesUntilIgnored.value = DEFAULT_MOSS_SETTINGS.max_until_ignored;
+		reportMaxMatchesDisplayed.value = DEFAULT_MOSS_SETTINGS.max_displayed_matches;
+		generateReportButton.disabled = true;
+	}
+};
+
+reportDropZone.onFileRejected = (reason) => {
 	displayError(reason);
 	
 	setTimeout(() => {

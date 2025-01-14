@@ -1,46 +1,40 @@
 // Document references to job submission elements
-let createJobModalElement = document.getElementById("generate-report-modal");
-let createJobModal = new bootstrap.Modal(createJobModalElement);
-let createJobForm = document.getElementById("generate-report-form");
-let jobName = document.getElementById("report-name");
-let jobLanguage = document.getElementById("report-language");
-let jobMaxMatchesUntilIgnored = document.getElementById("report-max-until-ignored");
-let jobMaxMatchesDisplayed = document.getElementById("report-max-displayed-matches");
-let jobMessage = document.getElementById("report-message");
-let createJobButton = document.getElementById("generate-report-button");
-
-let sizeExceededModalElement = document.getElementById("size-exceeded-modal");
-let sizeExceededModal = new bootstrap.Modal(sizeExceededModalElement);
-
-let timedMessage = undefined;
-let isShowingTimedMessage = false;
+let createReportModalElement = document.getElementById("generate-report-modal");
+let createReportModal = new bootstrap.Modal(createReportModalElement);
+let createReportForm = document.getElementById("generate-report-form");
+let reportName = document.getElementById("report-name");
+let reportLanguage = document.getElementById("report-language");
+let reportMaxMatchesUntilIgnored = document.getElementById("report-max-until-ignored");
+let reportMaxMatchesDisplayed = document.getElementById("report-max-displayed-matches");
+let reportMessage = document.getElementById("report-message");
+let createReportButton = document.getElementById("generate-report-button");
 
 /**
- * Set the message at the bottom left hand corner of the job submission modal. If the current message
+ * Set the message at the bottom left hand corner of the report submission modal. If the current message
  * being displayed is timed, it will stop and be replaced with the new one.
  */
-function setMessage(message, colour){
+function setReportMessage(message, colour){
 	if (isShowingTimedMessage){
 		clearInterval(timedMessage);
 	}
-	jobMessage.textContent = message;
-	jobMessage.style.color = colour;
+	reportMessage.textContent = message;
+	reportMessage.style.color = colour;
 }
 
 /**
  * Display a message that times out after a specified duration.
  */
-function showTimedMessage(message, colour, duration, onShow, onTimeout){
+function showTimedReportMessage(message, colour, duration, onShow, onTimeout){
 	if (isShowingTimedMessage){
 		clearTimeout(timedMessage);
 	}
 
-	setMessage(message, colour);
+	setReportMessage(message, colour);
 	isShowingTimedMessage = true;
 	onShow();
 
 	timedMessage = setTimeout(function () {
-		setMessage("", "white");
+		setReportMessage("", "white");
 		isShowingTimedMessage = false;
 		onTimeout();
 	}, 
@@ -50,42 +44,34 @@ function showTimedMessage(message, colour, duration, onShow, onTimeout){
 /**
  * Display an error message that shakes the modal and times out after 3 seconds.
  */
-function displayError(errorMessage) {
-	showTimedMessage(errorMessage, "var(--bs-danger)", 3000, function(){
-		createJobModalElement.classList.add("animate__animated", "animate__shakeX");
+function displayReportError(errorMessage) {
+	showTimedReportMessage(errorMessage, "var(--bs-danger)", 3000, function(){
+		createReportModalElement.classList.add("animate__animated", "animate__shakeX");
 	}, function(){
-		createJobModalElement.classList.remove("animate__animated", "animate__shakeX");
+		createReportModalElement.classList.remove("animate__animated", "animate__shakeX");
 	});
 }
 
 /**
  * Toggle job submission (i.e., whether you can submit jobs or not).
  */
-function setEnabled(isEnabled) {
-	createJobButton.disabled
-		= jobName.disabled
-		= jobLanguage.disabled
-		= jobMaxMatchesUntilIgnored.disabled
-		= jobMaxMatchesDisplayed.disabled
-		= jobAttachBaseFiles.disabled
+function setReportEnabled(isEnabled) {
+	createReportButton.disabled
+		= reportName.disabled
+		= reportLanguage.disabled
+		= reportMaxMatchesUntilIgnored.disabled
+		= reportMaxMatchesDisplayed.disabled
 		= !isEnabled;
 }
 
-/**
- * Downloads the python script to perform pre-processing locally.
- */
-function downloadPythonScript(){
-	location.href = PYTHON_SCRIPT_URL;
-}
-
-createJobForm.onsubmit = async (e) => {
+createReportForm.onsubmit = async (e) => {
 	e.preventDefault(); // Prevent the modal from closing immediately.
 	
 	try {
 		// Create a new form (and capture name, language, max matches until ignored and max matches displayed)
-		let jobFormData = new FormData(createJobForm);
-		setEnabled(false);
-		setMessage("Stitching...", "white");
+		let reportFormData = new FormData(createReportForm);
+		setReportEnabled(false);
+		setReportMessage("Stitching...", "white");
 
 		// Submit the job (must use XMLHttpRequest to receive callbacks about upload progress).
 		let xhr = new XMLHttpRequest();
@@ -96,44 +82,49 @@ createJobForm.onsubmit = async (e) => {
 		// Other events: error, abort, timeout
 
 		xhr.upload.addEventListener('loadstart', e => {
-			setMessage("Uploading (0%)", "white");
+			setReportMessage("Uploading (0%)", "white");
 		});
 		xhr.upload.addEventListener('progress', e => {
 			let percentage = e.lengthComputable ? (e.loaded / e.total) * 100 : 0;
-			setMessage(`Uploading (${percentage.toFixed(0)}%)`, "white");
+			setReportMessage(`Uploading (${percentage.toFixed(0)}%)`, "white");
 		});
 		// Done uploading, now server is processing upload (writing files to disk).
 		xhr.upload.addEventListener('load', e => {
-			setMessage("Waiting for server...", "white");
+			setReportMessage("Waiting for server...", "white");
 		});
 		xhr.onreadystatechange = function (){ // Call a function when the state changes.
 			if (this.readyState === XMLHttpRequest.DONE){
 				if (this.status === 200){
 
+					// Obtain job as json data and add to the jobs table.
+					let json = xhr.response;
+					addJob(json, true);
+					unfinishedJobs.push(json["job_id"]);
+
 					// Hide and reset the form and dropzone.
-					createJobModal.hide();
+					createReportModal.hide();
 					setTimeout(() => { // Timeout to ensure that the modal only clears once closed.
-						createJobForm.reset();
+						createReportForm.reset();
 						updateForBaseFiles();
-						setEnabled(true);
-						setMessage("", "white");
+						setReportEnabled(true);
+						setReportMessage("", "white");
 					}, 200);
 
 				}else if (this.status === 400){ // Server returns an error message regarding the submission.
 					try {
-						displayError(xhr.response.message);
+						displayReportError(xhr.response.message);
 					} catch (error) {
-						displayError(error);
+						displayReportError(error);
 					}
-					setEnabled(true);
+					setReportEnabled(true);
 				}
 			}
 		}
-		xhr.send(jobFormData);
+		xhr.send(reportFormData);
 
 	}catch(err){ // Unknown client-side error.
 		console.error(err);
-		displayError("An error occurred.");
-		setEnabled(true);
+		displayReportError("An error occurred.");
+		setReportEnabled(true);
 	}
 };

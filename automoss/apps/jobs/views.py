@@ -14,6 +14,8 @@ from django.utils.timezone import now
 
 from .tasks import process_job
 
+from ..results.models import MOSSResult
+
 from .models import (
     Job,
     Submission,
@@ -70,6 +72,49 @@ class Index(View):
         """ Get jobs """
         return render(request, self.template, self.context)
 
+@method_decorator(login_required, name="dispatch")
+class Upload(View):
+    """ File upload view """
+
+    def post(self, request):
+        """ Post files to upload """
+
+        if not request.FILES.getlist(FILES_NAME):
+            data = {
+                'message': 'No files submitted'
+            }
+            return JsonResponse(data, status=400)
+        
+        for file_type in SUBMISSION_TYPES:
+            for f in request.FILES.getlist(file_type):
+
+                name_parts = f.name.split('_')
+                
+                if len(name_parts)<3:
+                    continue    #file not named properly, skip
+                
+                #Use get_or_create to avoid duplicates, [0] is the object, [1] is whether it was gotten or created
+                submission = Submission.objects.get_or_create(
+                    user=request.user,
+                    file_name=name_parts[0],
+                    file_type=file_type,
+                    semester=name_parts[2],
+                    assignment=name_parts[1],
+                )[0]
+
+                file_path = SUBMISSION_UPLOAD_TEMPLATE.format(
+                    user_id=request.user.user_id,
+                    assignment=submission.assignment,
+                    file_type=file_type,
+                    semester=submission.semester,
+                    name=submission.file_name,
+                )
+
+                # Ensure directory exists (only run once)
+                os.makedirs(os.path.dirname(file_path), exist_ok=True)
+
+                with open(file_path, 'wb') as fp:
+                    fp.write(f.read())
 
 @method_decorator(login_required, name='dispatch')
 class New(View):
@@ -100,12 +145,6 @@ class New(View):
             }
             return JsonResponse(data, status=400)
 
-        if not request.FILES.getlist(FILES_NAME):
-            data = {
-                'message': 'No files submitted'
-            }
-            return JsonResponse(data, status=400)
-
         comment = request.POST.get('job-name')
 
         num_students = len(request.FILES.getlist(FILES_NAME))
@@ -123,29 +162,12 @@ class New(View):
 
         job_id = new_job.job_id
 
-        for file_type in SUBMISSION_TYPES:
-            for f in request.FILES.getlist(file_type):
-
-                submission = Submission.objects.create(
-                    job=new_job, name=f.name, file_type=file_type)
-
-                file_path = SUBMISSION_UPLOAD_TEMPLATE.format(
-                    user_id=request.user.user_id,
-                    job_id=job_id,
-                    file_type=file_type,
-                    file_id=submission.submission_id
-                )
-
-                # Ensure directory exists (only run once)
-                os.makedirs(os.path.dirname(file_path), exist_ok=True)
-
-                with open(file_path, 'wb') as fp:
-                    fp.write(f.read())
+        
 
         JobEvent.objects.create(
-            job=new_job, type=INQUEUE_EVENT, message='Placed in the processing queue')
+            job=new_job, type=INQUEUE_EVENT, message=f'Placed in the processing queue')
 
-        process_job.delay(job_id)
+        process_job.delay(job_id, request.POST.get('job-url'))
 
         data = json.loads(serialize('json', [new_job]))[0]['fields']
         return JsonResponse(data, status=200, safe=False)
@@ -215,6 +237,8 @@ class Retry(View):
 
     def post(self, request):
         """ Retry a user's job """
+
+
         job_id = json.loads(request.body.decode("UTF-8")).get('job_id')
 
         try:

@@ -456,7 +456,7 @@ createJobForm.onsubmit = async (e) => {
 					try {
 						displayError(xhr.response.message);
 					} catch (error) {
-						displayError("An error occurred.");
+						displayError(error);
 					}
 					jobDropZone.resetProgress();
 					setEnabled(true);

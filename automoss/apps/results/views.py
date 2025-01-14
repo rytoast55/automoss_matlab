@@ -56,9 +56,10 @@ class ResultMatch(View):
 
             file_path = SUBMISSION_UPLOAD_TEMPLATE.format(
                 user_id=request.user.user_id,
-                job_id=job_id,
+                assignment=submission.assignment,
                 file_type='files',
-                file_id=submission.submission_id
+                semester=submission.semester,
+                name=submission.file_name,
             )
 
             if not os.path.exists(file_path):

@@ -32,7 +32,7 @@ HOSTNAME = os.getenv("HOST_NAME")
 
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = False
+DEBUG = True
 
 # Specify local/testing server hosts
 ALLOWED_HOSTS = ['localhost', '127.0.0.1', '0.0.0.0']
@@ -289,9 +289,9 @@ with capture_in(SUBMISSION_CONTEXT):
 
 JOB_CONTEXT = {}
 with capture_in(JOB_CONTEXT):
-    JOB_URL_TEMPLATE = f'{MEDIA_ROOT}/{{user_id}}/{{job_id}}'
+    JOB_URL_TEMPLATE = f'{MEDIA_ROOT}/{{user_id}}/{{assignment}}'
     JOB_UPLOAD_TEMPLATE = f'{JOB_URL_TEMPLATE}/uploads'
-    SUBMISSION_UPLOAD_TEMPLATE = f'{JOB_UPLOAD_TEMPLATE}/{{file_type}}/{{file_id}}'
+    SUBMISSION_UPLOAD_TEMPLATE = f'{JOB_UPLOAD_TEMPLATE}/{{file_type}}/{{semester}}/{{name}}'
 
     MIN_RETRIES_COUNT = 3
     MIN_RETRY_TIME = 30

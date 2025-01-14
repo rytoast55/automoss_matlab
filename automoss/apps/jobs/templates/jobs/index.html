@@ -16,6 +16,7 @@
 	<script src="{% static "lib/uncompress/archive.lib.min.js" %}" defer></script>
 	<script src="{% static "lib/uncompress/xz.js" %}" defer></script>
 	<script src="{% static "js/job.js" %}" defer></script>
+	<script src="{% static "js/fileUpload.js" %}" defer></script>
 	<script src="{% static "js/jobSubmission.js" %}" defer></script>
 	<script src="{% static "js/timeline.js" %}" defer></script>
 	<script src="{% static "js/timelineEvent.js" %}" defer></script>
@@ -55,7 +56,7 @@
 					<svg xmlns="http://www.w3.org/2000/svg" width="23" height="23" fill="currentColor" class="bi bi-plus" viewBox="4 2.5 13 13">
 						<path d="M8 4a.5.5 0 0 1 .5.5v3h3a.5.5 0 0 1 0 1h-3v3a.5.5 0 0 1-1 0v-3h-3a.5.5 0 0 1 0-1h3v-3A.5.5 0 0 1 8 4z"/>
 					</svg>
-					Create Job
+					Upload Files
 				</button>
 			</span>
 			<span class="input-group-btn">
@@ -63,7 +64,7 @@
 					<svg xmlns="http://www.w3.org/2000/svg" width="23" height="23" fill="currentColor" class="bi bi-plus" viewBox="4 2.5 13 13">
 						<path d="M8 4a.5.5 0 0 1 .5.5v3h3a.5.5 0 0 1 0 1h-3v3a.5.5 0 0 1-1 0v-3h-3a.5.5 0 0 1 0-1h3v-3A.5.5 0 0 1 8 4z"/>
 					</svg>
-					Generate Report
+					Create Report
 				</button>
 			</span>
 		</div>
@@ -101,22 +102,29 @@
 
 				<!-- Header -->
 				<div class="modal-header bg-dark text-light">
-					<h5 class="modal-title"><b>Create Job</b></h5>
+					<h5 class="modal-title"><b>Submit Job</b></h5>
 					<button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
 				</div>
 
 				<!-- Body -->
 				<div class="modal-body">
 
-					<!-- Drop Zone -->
-					<div class="mb-3">
-						<drop-zone id="report-drop-zone" filetypes="rar,tar,tar.bz2,tar.gz,tar.xz,zip" maxfilesize="{{MAX_FILE_SIZE}}" text="Drag and drop <b>student</b> files here!"></drop-zone>
-					</div>
-
 					<!-- Name -->
 					<div class="mb-3">
-						<label for="report-name">Name:</label>
+						<label for="report-name">Report Name:</label>
 						<input class="form-control" id="report-name" type="text" name="job-name" autocomplete="off" data-lpignore="true" data-form-type="text">
+					</div>
+
+					<!-- Assignment name -->
+					<div class="mb-3">
+						<label for="report-name">Assignment:</label>
+						<input class="form-control" id="report-assignment" type="text" name="job-assignment" autocomplete="off" data-lpignore="true" data-form-type="text">
+					</div>
+
+					<!-- Semester to filter for -->
+					<div class="mb-3">
+						<label for="report-semester">Semester:</label>
+						<input class="form-control" id="report-semester" type="text" name="job-semester" autocomplete="off" data-lpignore="true" data-form-type="text">
 					</div>
 
 					<!-- Language -->
@@ -146,29 +154,17 @@
 							<output style="width: 50px; text-align: right;">{{DEFAULT_MOSS_SETTINGS.max_displayed_matches}}</output>
 						</div>
 					</div>
-
-					<!-- Base Files -->
-					<div class="mb-3">
-						<label for="report-attach-base-files">Attach base files?</label>
-						<input class="form-check-input ms-1" id="report-attach-base-files" type="checkbox" value="" name="job-attach-base-files" onchange="updateForBaseFiles();">
-					</div>
-
-					<!-- Report URL -->
-					<div class="mb-3">
-						<label for="report-url">Report URL:</label>
-						<input class="form-control" id="report-url" type="text" name="report-url" autocomplete="off" data-lpignore="true" data-form-type="text">
-					</div>
 				</div>
 
 				<!-- Footer -->
 				<div class="modal-footer d-flex justify-content-between p-2 bg-dark text-light">
 					<label id="report-message"></label>
 					<div style="position: relative; max-height: 50px;">
-						<button id="generate-report-button" type="submit" class="btn btn-outline-primary border-2 rounded-pill" disabled>
+						<button id="generate-report-button" type="submit" class="btn btn-outline-primary border-2 rounded-pill">
 							<svg xmlns="http://www.w3.org/2000/svg" width="23" height="23" fill="currentColor" class="bi bi-plus" viewBox="4 2.5 13 13">
 								<path d="M8 4a.5.5 0 0 1 .5.5v3h3a.5.5 0 0 1 0 1h-3v3a.5.5 0 0 1-1 0v-3h-3a.5.5 0 0 1 0-1h3v-3A.5.5 0 0 1 8 4z"/>
 							</svg>
-						Create</button>
+						Submit</button>
 					</div>
 				</div>
 			</form>
@@ -176,7 +172,7 @@
 	</div>
 </div>
 
-<!-- Create Job Modal -->
+<!-- Upload Files Modal -->
 <div class="modal fade" id="create-job-modal" tabindex="-1" aria-hidden="true">
 	<div class="modal-dialog modal-dialog-centered">
 		<div class="modal-content">
@@ -186,7 +182,7 @@
 
 				<!-- Header -->
 				<div class="modal-header bg-dark text-light">
-					<h5 class="modal-title"><b>Create Job</b></h5>
+					<h5 class="modal-title"><b>Upload Files</b></h5>
 					<button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
 				</div>
 
@@ -196,12 +192,6 @@
 					<!-- Drop Zone -->
 					<div class="mb-3">
 						<drop-zone id="job-drop-zone" filetypes="rar,tar,tar.bz2,tar.gz,tar.xz,zip" maxfilesize="{{MAX_FILE_SIZE}}" text="Drag and drop <b>student</b> files here!"></drop-zone>
-					</div>
-
-					<!-- Name -->
-					<div class="mb-3">
-						<label for="job-name">Name:</label>
-						<input class="form-control" id="job-name" type="text" name="job-name" autocomplete="off" data-lpignore="true" data-form-type="text">
 					</div>
 
 					<!-- Language -->
@@ -214,34 +204,10 @@
 						</select>
 					</div>
 
-					<!-- Max Matches Until Ignored -->
-					<div class="mb-3">
-						<label for="job-max-until-ignored" class="form-label">Max matches until ignored:</label>
-						<div class="d-flex">
-							<input type="range" class="form-range" min="{{MAX_UNTIL_IGNORED_RANGE.0}}" step="1" max="{{MAX_UNTIL_IGNORED_RANGE.1}}" id="job-max-until-ignored" name="job-max-until-ignored" value="{{DEFAULT_MOSS_SETTINGS.max_until_ignored}}" oninput="this.nextElementSibling.value = this.value">
-							<output style="width: 50px; text-align: right;">{{DEFAULT_MOSS_SETTINGS.max_until_ignored}}</output>
-						</div>
-					</div>
-
-					<!-- Max Matches Displayed -->
-					<div class="mb-3">
-						<label for="job-max-displayed-matches" class="form-label">Max matches displayed:</label>
-						<div class="d-flex">
-							<input type="range" class="form-range" min="{{MAX_DISPLAYED_MATCHES_RANGE.0}}" step="1" max="{{MAX_DISPLAYED_MATCHES_RANGE.1}}" id="job-max-displayed-matches" name="job-max-displayed-matches" value="{{DEFAULT_MOSS_SETTINGS.max_displayed_matches}}" oninput="this.nextElementSibling.value = this.value">
-							<output style="width: 50px; text-align: right;">{{DEFAULT_MOSS_SETTINGS.max_displayed_matches}}</output>
-						</div>
-					</div>
-
 					<!-- Base Files -->
 					<div class="mb-3">
 						<label for="job-attach-base-files">Attach base files?</label>
 						<input class="form-check-input ms-1" id="job-attach-base-files" type="checkbox" value="" name="job-attach-base-files" onchange="updateForBaseFiles();">
-					</div>
-
-					<!-- Existing Report URL -->
-					<div class="mb-3">
-						<label for="job-url">Report URL:</label>
-						<input class="form-control" id="job-url" type="text" name="job-url" autocomplete="off" data-lpignore="true" data-form-type="text">
 					</div>
 				</div>
 
@@ -253,7 +219,7 @@
 							<svg xmlns="http://www.w3.org/2000/svg" width="23" height="23" fill="currentColor" class="bi bi-plus" viewBox="4 2.5 13 13">
 								<path d="M8 4a.5.5 0 0 1 .5.5v3h3a.5.5 0 0 1 0 1h-3v3a.5.5 0 0 1-1 0v-3h-3a.5.5 0 0 1 0-1h3v-3A.5.5 0 0 1 8 4z"/>
 							</svg>
-						Create</button>
+						Upload</button>
 					</div>
 				</div>
 			</form>

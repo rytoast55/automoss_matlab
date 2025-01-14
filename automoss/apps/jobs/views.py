@@ -72,59 +72,19 @@ class Index(View):
         """ Get jobs """
         return render(request, self.template, self.context)
 
-
-@method_decorator(login_required, name='dispatch')
-class New(View):
-    """ Job creation view """
+@method_decorator(login_required, name="dispatch")
+class Upload(View):
+    """ File upload view """
 
     def post(self, request):
-        """ Post new job """
-        posted_language = request.POST.get('job-language')
-        language = READABLE_LANGUAGE_MAPPING.get(posted_language)
-
-        if language is None:
-            data = {
-                'message': f'Unsupported language selected ({language})'
-            }
-            return JsonResponse(data, status=400)
-
-        max_until_ignored = request.POST.get('job-max-until-ignored')
-        if not in_range(max_until_ignored, MAX_UNTIL_IGNORED_RANGE):
-            data = {
-                'message': 'Invalid parameter: Max until ignored'
-            }
-            return JsonResponse(data, status=400)
-
-        max_displayed_matches = request.POST.get('job-max-displayed-matches')
-        if not in_range(max_displayed_matches, MAX_DISPLAYED_MATCHES_RANGE):
-            data = {
-                'message': 'Invalid parameter: Max displayed matches'
-            }
-            return JsonResponse(data, status=400)
+        """ Post files to upload """
 
         if not request.FILES.getlist(FILES_NAME):
             data = {
                 'message': 'No files submitted'
             }
             return JsonResponse(data, status=400)
-
-        comment = request.POST.get('job-name')
-
-        num_students = len(request.FILES.getlist(FILES_NAME))
-
-        new_job = Job.objects.create(
-            user=request.user,
-            language=language,
-            num_students=num_students,
-            comment=comment,
-            max_until_ignored=max_until_ignored,
-            max_displayed_matches=max_displayed_matches
-        )
-        JobEvent.objects.create(job=new_job, type=CREATED_EVENT,
-                                message=f'Created job for {num_students} students with language=\'{posted_language}\', {max_until_ignored=} and {max_displayed_matches=}')
-
-        job_id = new_job.job_id
-
+        
         for file_type in SUBMISSION_TYPES:
             for f in request.FILES.getlist(file_type):
 
@@ -155,6 +115,54 @@ class New(View):
 
                 with open(file_path, 'wb') as fp:
                     fp.write(f.read())
+
+@method_decorator(login_required, name='dispatch')
+class New(View):
+    """ Job creation view """
+
+    def post(self, request):
+        """ Post new job """
+        posted_language = request.POST.get('job-language')
+        language = READABLE_LANGUAGE_MAPPING.get(posted_language)
+
+        if language is None:
+            data = {
+                'message': f'Unsupported language selected ({language})'
+            }
+            return JsonResponse(data, status=400)
+
+        max_until_ignored = request.POST.get('job-max-until-ignored')
+        if not in_range(max_until_ignored, MAX_UNTIL_IGNORED_RANGE):
+            data = {
+                'message': 'Invalid parameter: Max until ignored'
+            }
+            return JsonResponse(data, status=400)
+
+        max_displayed_matches = request.POST.get('job-max-displayed-matches')
+        if not in_range(max_displayed_matches, MAX_DISPLAYED_MATCHES_RANGE):
+            data = {
+                'message': 'Invalid parameter: Max displayed matches'
+            }
+            return JsonResponse(data, status=400)
+
+        comment = request.POST.get('job-name')
+
+        num_students = len(request.FILES.getlist(FILES_NAME))
+
+        new_job = Job.objects.create(
+            user=request.user,
+            language=language,
+            num_students=num_students,
+            comment=comment,
+            max_until_ignored=max_until_ignored,
+            max_displayed_matches=max_displayed_matches
+        )
+        JobEvent.objects.create(job=new_job, type=CREATED_EVENT,
+                                message=f'Created job for {num_students} students with language=\'{posted_language}\', {max_until_ignored=} and {max_displayed_matches=}')
+
+        job_id = new_job.job_id
+
+        
 
         JobEvent.objects.create(
             job=new_job, type=INQUEUE_EVENT, message=f'Placed in the processing queue')

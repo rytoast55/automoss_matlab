@@ -272,26 +272,21 @@ let loadFormatsPromise = new Promise((resolve, reject) => {
 let createJobModalElement = document.getElementById("create-job-modal");
 let createJobModal = new bootstrap.Modal(createJobModalElement);
 let createJobForm = document.getElementById("create-job-form");
-let jobDropZone = document.getElementById("job-drop-zone");
 let jobName = document.getElementById("job-name");
 let jobLanguage = document.getElementById("job-language");
 let jobMaxMatchesUntilIgnored = document.getElementById("job-max-until-ignored");
 let jobMaxMatchesDisplayed = document.getElementById("job-max-displayed-matches");
-let jobAttachBaseFiles = document.getElementById("job-attach-base-files");
 let jobMessage = document.getElementById("job-message");
 let createJobButton = document.getElementById("create-job-button");
 
-let generateReportModalElement = document.getElementById("generate-report-modal");
-let generateReportModal = new bootstrap.Modal(generateReportModalElement);
-let generateReportForm = document.getElementById("generate-report-form");
-let reportDropZone = document.getElementById("report-drop-zone");
-let reportName = document.getElementById("report-name");
-let reportLanguage = document.getElementById("report-language");
-let reportMaxMatchesUntilIgnored = document.getElementById("report-max-until-ignored");
-let reportMaxMatchesDisplayed = document.getElementById("report-max-displayed-matches");
-let reportAttachBaseFiles = document.getElementById("report-attach-base-files");
-let reportMessage = document.getElementById("report-message");
-let generateReportButton = document.getElementById("generate-report-button");
+let uploadFileModalElement = document.getElementById("upload-file-modal");
+let uploadFileModal = new bootstrap.Modal(uploadFileModalElement);
+let uploadFileForm = document.getElementById("upload-file-form");
+let fileDropZone = document.getElementById("file-drop-zone");
+let fileLanguage = document.getElementById("file-language");
+let fileAttachBaseFiles = document.getElementById("file-attach-base-files");
+let uploadFileButton = document.getElementById("upload-file-button"); 
+let fileMessage = document.getElementById("file-message"); 
 
 let sizeExceededModalElement = document.getElementById("size-exceeded-modal");
 let sizeExceededModal = new bootstrap.Modal(sizeExceededModalElement);
@@ -359,7 +354,6 @@ function setEnabled(isEnabled) {
 		= jobLanguage.disabled
 		= jobMaxMatchesUntilIgnored.disabled
 		= jobMaxMatchesDisplayed.disabled
-		= jobAttachBaseFiles.disabled
 		= !isEnabled;
 }
 
@@ -384,6 +378,7 @@ createJobForm.onsubmit = async (e) => {
 			jobFormData.append(isBaseFile ? BASE_FILES_NAME : FILES_NAME, new Blob([data]), name);
 		}
 
+		/*
 		let numStudents = 0;
 		for (let jobDropZoneFile of jobDropZone.files) {
 			let archive = jobDropZoneFile.file;
@@ -405,6 +400,7 @@ createJobForm.onsubmit = async (e) => {
 			}
 			jobDropZoneFile.setProgress(1);
 		}
+		*/
 
 		// Check if there are at least 2 students.
 		if(numStudents <= 1){
@@ -473,115 +469,92 @@ createJobForm.onsubmit = async (e) => {
 	}
 };
 
-jobDropZone.onFileAdded = async (jobDropZoneFile) => {
-	createJobButton.disabled = true;
-
-	let archive = jobDropZoneFile.file;
-	let files = await extractFiles(archive);
-
-	/**
-	 * Get the extension name of a file.
-	 */
-	function getExtension(name) {
-		return name.split(".").pop();
+/**
+ * Set the message at the bottom left hand corner of the job submission modal. If the current message
+ * being displayed is timed, it will stop and be replaced with the new one.
+ */
+function setFileMessage(message, colour){
+	if (isShowingTimedMessage){
+		clearInterval(timedMessage);
 	}
-
-	/**
-	 * Quickly determine the most likely programming language for a collection of files.
-	 */
-	function getProgrammingLanguageId(files) {
-		let d = {};
-		for (let key in SUPPORTED_LANGUAGES) {
-			d[key] = 0;
-		}
-		for (let file of files) {
-			let extension = getExtension(file.name);
-			for (let key in SUPPORTED_LANGUAGES) {
-				if (SUPPORTED_LANGUAGES[key][2].includes(extension)) {
-					d[key] += 1;
-				}
-			}
-		}
-		return Object.entries(d).reduce((a, b) => a[1] > b[1] ? a : b)[0]
-	}
-
-	// Type
-	let isSingle = await isSingleSubmission(files);
-
-	// Programming Language
-	let langTestFiles = [...files];
-	if (!isSingle) {
-		let counter = 0;
-		let maxArchives = 3;
-		for (let file of files) {
-			if (isArchive(file.name)) {
-				let tmpArchive = await extractFiles(file);
-				for (let tmpFile of tmpArchive) {
-					langTestFiles.push(tmpFile);
-				}
-				counter++;
-			}
-			if (counter > maxArchives) break; // Stops checking after max archives.
-		}
-	}
-	let languageId = getProgrammingLanguageId(langTestFiles);
-	let language = SUPPORTED_LANGUAGES[languageId][0];
-
-	// Tags
-	if (jobAttachBaseFiles.checked) {
-		jobDropZoneFile.addTag("Base", "var(--bs-dark)");
-		jobDropZoneFile.isBaseFile = true;
-	} else {
-		jobDropZoneFile.addTag(isSingle ? "Single" : `Batch (${countStudentsInBatch(files)})`, "var(--bs-dark)");
-	}
-
-	if (jobDropZone.files.length >= 1) {
-		jobName.value = jobName.value || trimRight(archive.name, getExtension(archive.name).length + 1);
-		jobLanguage.value = language;
-	}
-	createJobButton.disabled = false;
-};
-
-jobDropZone.onFileRemoved = () => {
-	if (jobDropZone.files.length == 0) {
-		jobName.value = "";
-		jobLanguage.selectedIndex = 0;
-		jobMaxMatchesUntilIgnored.value = DEFAULT_MOSS_SETTINGS.max_until_ignored;
-		jobMaxMatchesDisplayed.value = DEFAULT_MOSS_SETTINGS.max_displayed_matches;
-		createJobButton.disabled = true;
-	}
-};
-
-jobDropZone.onFileRejected = (reason) => {
-	displayError(reason);
-	
-	setTimeout(() => {
-		if (reason.startsWith("File size exceeds")){
-			sizeExceededModal.show();
-		}
-	}, 1000)
+	fileMessage.textContent = message;
+	fileMessage.style.color = colour;
 }
 
+/**
+ * Display a message that times out after a specified duration.
+ */
+function showTimedFileMessage(message, colour, duration, onShow, onTimeout){
+	if (isShowingTimedMessage){
+		clearTimeout(timedMessage);
+	}
 
-generateReportForm.onsubmit = async (e) => {
+	setFileMessage(message, colour);
+	isShowingTimedMessage = true;
+	onShow();
+
+	timedMessage = setTimeout(function () {
+		setFileMessage("", "white");
+		isShowingTimedMessage = false;
+		onTimeout();
+	}, 
+	duration);
+}
+
+/**
+ * Display an error message that shakes the modal and times out after 3 seconds.
+ */
+function displayFileError(errorMessage) {
+	showTimedFileMessage(errorMessage, "var(--bs-danger)", 3000, function(){
+		uploadFileModalElement.classList.add("animate__animated", "animate__shakeX");
+	}, function(){
+		uploadFileModalElement.classList.remove("animate__animated", "animate__shakeX");
+	});
+}
+
+/**
+ * Update the drop zone's call to action (C2A) depending on the attach base files toggle.
+ */
+function updateFileForBaseFiles() {
+	fileDropZone.setC2A(`Drag and drop <b>${jobAttachBaseFiles.checked ? "base" : "student"}</b> files here!`);
+}
+
+/**
+ * Toggle job submission (i.e., whether you can submit jobs or not).
+ */
+function setFileEnabled(isEnabled) {
+	fileDropZone.setInteractable(isEnabled);
+	uploadFileButton.disabled
+		= fileAttachBaseFiles.disabled
+		= !isEnabled;
+}
+
+/**
+ * Downloads the python script to perform pre-processing locally.
+ */
+function downloadPythonScript(){
+	location.href = PYTHON_SCRIPT_URL;
+}
+
+uploadFileForm.onsubmit = async (e) => {
 	e.preventDefault(); // Prevent the modal from closing immediately.
 	
 	try {
 		// Create a new form (and capture name, language, max matches until ignored and max matches displayed)
-		let reportFormData = new FormData(generateReportForm);
-		setEnabled(false);
-		setMessage("Stitching...", "white");
+		let fileFormData = new FormData(uploadFileForm);
+		setFileEnabled(false);
+		setFileMessage("Stitching...", "white");
 
 		// Capture files separately and append to form.
 		function appendFilesToForm(name, data, isBaseFile) {
-			reportFormData.append(isBaseFile ? BASE_FILES_NAME : FILES_NAME, new Blob([data]), name);
+			fileFormData.append(isBaseFile ? BASE_FILES_NAME : FILES_NAME, new Blob([data]), name);
 		}
 
 		let numStudents = 0;
-		for (let reportDropZoneFile of reportDropZone.files) {
-			let archive = reportDropZone.file;
-			let languageId = reportLanguage.options[reportLanguage.selectedIndex].getAttribute("language-id");
-			let isBaseFile = reportDropZoneFile.isBaseFile;
+		for (let fileDropZoneFile of fileDropZone.files) {
+			let archive =  fileDropZone.file;
+			let isBaseFile = fileDropZoneFile.isBaseFile;
+			let languageId = fileLanguage.options[fileLanguage.selectedIndex].getAttribute("language-id");
 			let files = await extractFiles(archive, languageId);
 			if (await isSingleSubmission(files, languageId) || isBaseFile) {
 				appendFilesToForm(archive.name, await extractSingle(files, languageId), isBaseFile);
@@ -592,84 +565,85 @@ generateReportForm.onsubmit = async (e) => {
 				let counter = 0;
 				await extractBatch(files, languageId, (name, data) => {
 					appendFilesToForm(name, data, false);
-					reportDropZoneFile.setProgress(++counter / files.length);
+					fileDropZoneFile.setProgress(++counter / files.length);
 				});
 				numStudents += counter;
 			}
-			reportDropZoneFile.setProgress(1);
+			fileDropZoneFile.setProgress(1);
 		}
 
 		// Check if there are at least 2 students.
 		if(numStudents <= 1){
-			displayError("Must include at least 2 students.");
-			reportDropZone.resetProgress();
-			setEnabled(true);
+			displayFileError("Must include at least 2 students.");
+			fileDropZone.resetProgress();
+			setFileEnabled(true);
+			return;
+		}
+		else if(numStudents >= 100){
+			//I don't know why, but whenever I try over 100 something breaks
+			displayFileError("Can't include over 100 students.");
+			fileDropZone.resetProgress();
+			setFileEnabled(true);
 			return;
 		}
 
 		// Submit the job (must use XMLHttpRequest to receive callbacks about upload progress).
 		let xhr = new XMLHttpRequest();
 		xhr.responseType = 'json';
-		xhr.open('POST', NEW_JOB_URL);
+		xhr.open('POST', UPLOAD_FILES_URL);
 
 		// https://developer.mozilla.org/en-US/docs/Web/API/XMLHttpRequest/upload
 		// Other events: error, abort, timeout
 
 		xhr.upload.addEventListener('loadstart', e => {
-			setMessage("Uploading (0%)", "white");
+			setFileMessage("Uploading (0%)", "white");
 		});
 		xhr.upload.addEventListener('progress', e => {
 			let percentage = e.lengthComputable ? (e.loaded / e.total) * 100 : 0;
-			setMessage(`Uploading (${percentage.toFixed(0)}%)`, "white");
+			setFileMessage(`Uploading (${percentage.toFixed(0)}%)`, "white");
 		});
 		// Done uploading, now server is processing upload (writing files to disk).
 		xhr.upload.addEventListener('load', e => {
-			setMessage("Waiting for server...", "white");
+			setFileMessage("Waiting for server...", "white");
 		});
 		xhr.onreadystatechange = function (){ // Call a function when the state changes.
 			if (this.readyState === XMLHttpRequest.DONE){
 				if (this.status === 200){
-
-					// Obtain job as json data and add to the jobs table.
-					let json = xhr.response;
-					addJob(json, true);
-					unfinishedJobs.push(json["job_id"]);
-
 					// Hide and reset the form and dropzone.
-					generateReportModal.hide();
+					uploadFileModal.hide();
 					setTimeout(() => { // Timeout to ensure that the modal only clears once closed.
-						generateReportForm.reset();
-						reportDropZone.reset();
-						updateForBaseFiles();
-						setEnabled(true);
-						setMessage("", "white");
+						uploadFileForm.reset();
+						fileDropZone.reset();
+						updateFileForBaseFiles();
+						setFileEnabled(true);
+						setFileMessage("", "white");
 					}, 200);
 
 				}else if (this.status === 400){ // Server returns an error message regarding the submission.
 					try {
-						displayError(xhr.response.message);
+						displayFileError(xhr.response.message);
 					} catch (error) {
-						displayError("An error occurred.");
+						displayFileError("An error occurred.");
 					}
-					reportDropZone.resetProgress();
-					setEnabled(true);
+					fileDropZone.resetProgress();
+					setFileEnabled(true);
 				}
 			}
 		}
-		xhr.send(reportFormData);
+		xhr.send(fileFormData);
 
 	}catch(err){ // Unknown client-side error.
 		console.error(err);
-		displayError("An error occurred.");
-		reportDropZone.resetProgress();
-		setEnabled(true);
+		displayFileError("An error occurred.");
+		fileDropZone.resetProgress();
+		setFileEnabled(true);
 	}
 };
 
-reportDropZone.onFileAdded = async (reportDropZoneFile) => {
-	generateReportButton.disabled = true;
+fileDropZone.onFileAdded = async (fileDropZoneFile) => {
+	uploadFileButton.disabled = true;
 
-	let archive = reportDropZoneFile.file;
+	let archive = fileDropZoneFile.file;
 	let files = await extractFiles(archive);
 
 	/**
@@ -721,32 +695,28 @@ reportDropZone.onFileAdded = async (reportDropZoneFile) => {
 	let language = SUPPORTED_LANGUAGES[languageId][0];
 
 	// Tags
-	if (reportAttachBaseFiles.checked) {
-		reportDropZoneFile.addTag("Base", "var(--bs-dark)");
-		reportDropZoneFile.isBaseFile = true;
+	if (fileAttachBaseFiles.checked) {
+		fileDropZoneFile.addTag("Base", "var(--bs-dark)");
+		fileDropZoneFile.isBaseFile = true;
 	} else {
-		reportDropZoneFile.addTag(isSingle ? "Single" : `Batch (${countStudentsInBatch(files)})`, "var(--bs-dark)");
+		fileDropZoneFile.addTag(isSingle ? "Single" : `Batch (${countStudentsInBatch(files)})`, "var(--bs-dark)");
 	}
 
-	if (reportDropZone.files.length >= 1) {
-		reportName.value = reportName.value || trimRight(archive.name, getExtension(archive.name).length + 1);
+	if (fileDropZone.files.length >= 1) {
 		reportLanguage.value = language;
 	}
-	generateReportButton.disabled = false;
+
+	uploadFileButton.disabled = false;
 };
 
-reportDropZone.onFileRemoved = () => {
-	if (reportDropZone.files.length == 0) {
-		reportName.value = "";
-		reportLanguage.selectedIndex = 0;
-		reportMaxMatchesUntilIgnored.value = DEFAULT_MOSS_SETTINGS.max_until_ignored;
-		reportMaxMatchesDisplayed.value = DEFAULT_MOSS_SETTINGS.max_displayed_matches;
-		generateReportButton.disabled = true;
+fileDropZone.onFileRemoved = () => {
+	if (fileDropZone.files.length == 0) {
+		uploadFileButton.disabled = true;
 	}
 };
 
-reportDropZone.onFileRejected = (reason) => {
-	displayError(reason);
+fileDropZone.onFileRejected = (reason) => {
+	displayFileError(reason);
 	
 	setTimeout(() => {
 		if (reason.startsWith("File size exceeds")){

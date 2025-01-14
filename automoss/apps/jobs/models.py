@@ -13,7 +13,7 @@ from ...settings import (
     DEFAULT_MOSS_SETTINGS,
     UUID_LENGTH,
     MAX_COMMENT_LENGTH,
-    JOB_URL_TEMPLATE
+    SUBMISSION_UPLOAD_TEMPLATE,
 )
 from ...apps.utils.core import (to_choices, get_longest_key, first)
 
@@ -51,6 +51,12 @@ class Job(models.Model):
         editable=False,
         unique=True
     )
+
+    # The name of the assignment that will be checked
+    assignment = models.CharField(max_length=10)
+
+    #The semester to filter for when filtering Matches
+    semester = models.CharField(max_length=5)
 
     # Language choice
     language = models.CharField(
@@ -92,37 +98,23 @@ class Job(models.Model):
 
     def __str__(self):
         """ Model to string method """
-        return f"{self.comment} ({self.job_id})"
-
-    def delete(self, using=None, keep_parents=False):
-        super().delete(using=using, keep_parents=keep_parents)
-
-        media_path = JOB_URL_TEMPLATE.format(
-            user_id=self.user.user_id, job_id=self.job_id)
-        if os.path.exists(media_path):
-            shutil.rmtree(media_path)
-
-            parent = os.path.dirname(media_path)
-            if len(os.listdir(parent)) == 0:  # Delete parent dir if empty
-                os.rmdir(parent)
+        return f"{self.comment} ({self.assignment} for {self.semester})"
 
 
 class Submission(models.Model):
     """ Class to model MOSS Report Entity """
-    # Job submission belongs to
-    job = models.ForeignKey(Job, on_delete=models.CASCADE)
 
-    # Unique identifier used in routing
-    submission_id = models.CharField(
-        primary_key=False,
-        default=uuid.uuid4,
-        max_length=UUID_LENGTH,
-        editable=False,
-        unique=True
-    )
+    # MOSS user that created the job
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    
+    # Semester the file is from
+    semester = models.CharField(max_length=5)
+
+    # Name of the assignment
+    assignment = models.CharField(max_length=10)
 
     # Name of the submission
-    name = models.CharField(max_length=64)
+    file_name = models.CharField(max_length=64)
 
     file_type = models.CharField(
         max_length=get_longest_key(SUBMISSION_TYPES),
@@ -130,8 +122,25 @@ class Submission(models.Model):
     )
 
     def __str__(self):
-        return f'{self.submission_id} ({self.name})'
+        return f'{self.file_name}_{self.assignment}_{self.semester}'
 
+    def delete(self, using=None, keep_parents=False):
+        super().delete(using=using, keep_parents=keep_parents)
+
+        media_path = SUBMISSION_UPLOAD_TEMPLATE.format(
+            user_id=self.user.user_id,
+            assignment=self.assignment,
+            file_type=self.file_type,
+            semester=self.semester,
+            name=self.file_name,
+        )
+
+        if os.path.exists(media_path):
+            shutil.rmtree(media_path)
+
+            parent = os.path.dirname(media_path)
+            if len(os.listdir(parent)) == 0:  # Delete parent dir if empty
+                os.rmdir(parent)
 
 class JobEvent(models.Model):
     """ Class to model Job events """

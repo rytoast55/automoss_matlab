@@ -128,14 +128,26 @@ class New(View):
         for file_type in SUBMISSION_TYPES:
             for f in request.FILES.getlist(file_type):
 
-                submission = Submission.objects.create(
-                    job=new_job, name=f.name, file_type=file_type)
+                name_parts = f.name.split('_')
+                
+                if len(name_parts)<3:
+                    continue    #file not named properly, skip
+                
+                #Use get_or_create to avoid duplicates, [0] is the object, [1] is whether it was gotten or created
+                submission = Submission.objects.get_or_create(
+                    user=request.user,
+                    file_name=name_parts[0],
+                    file_type=file_type,
+                    semester=name_parts[2],
+                    assignment=name_parts[1],
+                )[0]
 
                 file_path = SUBMISSION_UPLOAD_TEMPLATE.format(
                     user_id=request.user.user_id,
-                    job_id=job_id,
+                    assignment=submission.assignment,
                     file_type=file_type,
-                    file_id=submission.submission_id
+                    semester=submission.semester,
+                    name=submission.file_name,
                 )
 
                 # Ensure directory exists (only run once)
@@ -218,7 +230,7 @@ class Retry(View):
     def post(self, request):
         """ Retry a user's job """
 
-        
+
         job_id = json.loads(request.body.decode("UTF-8")).get('job_id')
 
         try:

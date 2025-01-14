@@ -97,7 +97,7 @@ def process_job(job_id, old_url):
     job.save()
 
     base_dir = JOB_UPLOAD_TEMPLATE.format(
-        user_id=job.user.user_id, job_id=job.job_id)
+        user_id=job.user.user_id, assignment=job.assignment)
 
     paths = {}
 

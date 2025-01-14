@@ -260,7 +260,7 @@ window.extractFiles = extractFiles;
 window.extractBatch = extractBatch;
 
 
-
+/*
 // Load all supported archive format types
 let loadFormatsPromise = new Promise((resolve, reject) => {
 	loadArchiveFormats(["zip", "tar", "rar"], () => {
@@ -268,18 +268,20 @@ let loadFormatsPromise = new Promise((resolve, reject) => {
 	});
 });
 
+*/
+
 // Document references to job submission elements
-let createJobModalElement = document.getElementById("create-job-modal");
+let createJobModalElement = document.getElementById("generate-report-modal");
 let createJobModal = new bootstrap.Modal(createJobModalElement);
-let createJobForm = document.getElementById("create-job-form");
-let jobDropZone = document.getElementById("job-drop-zone");
-let jobName = document.getElementById("job-name");
-let jobLanguage = document.getElementById("job-language");
-let jobMaxMatchesUntilIgnored = document.getElementById("job-max-until-ignored");
-let jobMaxMatchesDisplayed = document.getElementById("job-max-displayed-matches");
-let jobAttachBaseFiles = document.getElementById("job-attach-base-files");
-let jobMessage = document.getElementById("job-message");
-let createJobButton = document.getElementById("create-job-button");
+let createJobForm = document.getElementById("generate-report-form");
+let jobDropZone = document.getElementById("report-drop-zone");
+let jobName = document.getElementById("report-name");
+let jobLanguage = document.getElementById("report-language");
+let jobMaxMatchesUntilIgnored = document.getElementById("report-max-until-ignored");
+let jobMaxMatchesDisplayed = document.getElementById("report-max-displayed-matches");
+let jobAttachBaseFiles = document.getElementById("report-attach-base-files");
+let jobMessage = document.getElementById("report-message");
+let createJobButton = document.getElementById("generate-report-button");
 
 let sizeExceededModalElement = document.getElementById("size-exceeded-modal");
 let sizeExceededModal = new bootstrap.Modal(sizeExceededModalElement);
@@ -401,18 +403,11 @@ createJobForm.onsubmit = async (e) => {
 			setEnabled(true);
 			return;
 		}
-		else if(numStudents > 100){
-			//IDK why, but whenever I try over 100 files at once things break
-			displayError("Can't include over 100 students.");
-			jobDropZone.resetProgress();
-			setEnabled(true);
-			return;
-		}
 
 		// Submit the job (must use XMLHttpRequest to receive callbacks about upload progress).
 		let xhr = new XMLHttpRequest();
 		xhr.responseType = 'json';
-		xhr.open('POST', UPLOAD_FILES_URL);
+		xhr.open('POST', NEW_JOB_URL);
 
 		// https://developer.mozilla.org/en-US/docs/Web/API/XMLHttpRequest/upload
 		// Other events: error, abort, timeout
@@ -431,7 +426,7 @@ createJobForm.onsubmit = async (e) => {
 		xhr.onreadystatechange = function (){ // Call a function when the state changes.
 			if (this.readyState === XMLHttpRequest.DONE){
 				if (this.status === 200){
-					
+
 					// Hide and reset the form and dropzone.
 					createJobModal.hide();
 					setTimeout(() => { // Timeout to ensure that the modal only clears once closed.

@@ -115,6 +115,8 @@ class Upload(View):
 
                 with open(file_path, 'wb') as fp:
                     fp.write(f.read())
+        
+        return JsonResponse(data=None, status=200, safe=False)
 
 @method_decorator(login_required, name='dispatch')
 class New(View):

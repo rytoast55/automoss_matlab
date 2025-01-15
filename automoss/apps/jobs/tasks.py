@@ -330,7 +330,7 @@ def process_job(job_id):
             # Ensure matching submission is found (avoid future errors)
             if first_submission and second_submission:
 
-                is_relevant = (first_submission.semester is job.semester) or (second_submission.semester is job.semester)
+                is_relevant = (first_submission.semester == job.semester) or (second_submission.semester == job.semester)
 
                 # Only make a match if one of the files is from the semester we care about
                 if is_relevant:

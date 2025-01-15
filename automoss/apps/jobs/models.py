@@ -136,11 +136,20 @@ class Submission(models.Model):
         )
 
         if os.path.exists(media_path):
-            shutil.rmtree(media_path)
+            os.remove(media_path)
 
             parent = os.path.dirname(media_path)
             if len(os.listdir(parent)) == 0:  # Delete parent dir if empty
                 os.rmdir(parent)
+    
+    def get_path(self):
+        return SUBMISSION_UPLOAD_TEMPLATE.format(
+            user_id=self.user.user_id,
+            assignment=self.assignment,
+            file_type=self.file_type,
+            semester=self.semester,
+            name=self.file_name,
+        )
 
 class JobEvent(models.Model):
     """ Class to model Job events """

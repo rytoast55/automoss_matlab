@@ -36,12 +36,14 @@
 	<!-- Column headings -->
 	<thead class="table-dark" style="cursor: pointer;">
 		<tr>
-			<th scope="col" style="width: 12.5%">Match ID</th>
-			<th scope="col" style="width: 17.5%">Student 1</th>
+			<th scope="col" style="width: 10%">Match ID</th>
+			<th scope="col" style="width: 15%">Student 1</th>
+			<th scope="col" style="width: 5%">Semester</th>
 			<th scope="col" style="width: 20%">% Matched</th>
-			<th scope="col" style="width: 17.5%">Student 2</th>
+			<th scope="col" style="width: 15%">Student 2</th>
+			<th scope="col" style="width: 5%">Semester</th>
 			<th scope="col" style="width: 20%">% Matched</th>
-			<th scope="col" style="width: 12.5%">Lines Matched</th>
+			<th scope="col" style="width: 10%">Lines Matched</th>
 		</tr>
 	</thead>
 	
@@ -51,7 +53,8 @@
 		<tr id="{{ match.match_id }}">
 			<td><a style="text-decoration: none;" href="{% url "jobs:results:match" job.job_id match.match_id %}">{{ match.match_id|slice:"0:8" }}</a></td>
 
-			<td>{{ match.first_submission.name }}</td>
+			<td>{{ match.first_submission.file_name }}</td>
+			<td>{{ match.first_submission.semester}}</td>
 			<td class="p-2">
 				<div class="position-relative rounded d-flex align-items-center justify-space-between me-2" style="background-color: var(--bs-gray-300); transform: translateY(5px);">
 					<div class="rounded" style="width:{{ match.first_percentage }}%; height: 15px; background-color: var(--bs-{% if match.first_percentage > 50 %}danger{% elif match.first_percentage > 40 %}warning{% elif match.first_percentage > 20 %}yellow{% else %}success{% endif %});"><br></div>
@@ -59,7 +62,8 @@
 				</div>
 			</td>
 			
-			<td>{{ match.second_submission.name }}</td>	
+			<td>{{ match.second_submission.file_name }}</td>
+			<td>{{ match.second_submission.semester}}</td>	
 			<td class="p-2">
 				<div class="position-relative rounded d-flex align-items-center justify-space-between me-2" style="background-color: var(--bs-gray-300); transform: translateY(5px);">
 					<div class="rounded" style="width:{{ match.second_percentage }}%; height: 15px; background-color: var(--bs-{% if match.second_percentage > 50 %}danger{% elif match.second_percentage > 40 %}warning{% elif match.second_percentage > 20 %}yellow{% else %}success{% endif %});"><br></div>

@@ -19,13 +19,11 @@ from ...settings import (
     INQUEUE_STATUS,
     COMPLETED_STATUS,
     FAILED_STATUS,
-    SUBMISSION_TYPES,
+    BASE_FILES_NAME,
     FILES_NAME,
     STATUSES,
     JOB_UPLOAD_TEMPLATE,
-    DEBUG,
 
-    MIN_RETRIES_COUNT,
     MIN_RETRY_TIME,
     MAX_RETRY_TIME,
     MAX_RETRY_DURATION,
@@ -75,7 +73,7 @@ def send_email_notification(job):
 
 
 @app.task(name='Upload')
-def process_job(job_id, old_url):
+def process_job(job_id):
     """Process a job, given its ID"""
 
     try:
@@ -101,6 +99,34 @@ def process_job(job_id, old_url):
 
     paths = {}
 
+    base_files = Submission.objects.filter(user=job.user, assignment=job.assignment, file_type=BASE_FILES_NAME)
+    submissions = Submission.objects.filter(user=job.user, assignment=job.assignment, file_type=FILES_NAME)
+
+    if base_files.exists():
+        # Add any applicable base files
+        paths[BASE_FILES_NAME] = []
+
+        for f in base_files:
+            paths[BASE_FILES_NAME].append(f.get_path())
+    
+    if submissions.exists():
+        # Add all assignment submissions
+        paths[FILES_NAME] = []
+
+        for f in submissions:
+            paths[FILES_NAME].append(f.get_path())
+    else:
+        # No submissions, abort
+        job.status = FAILED_STATUS
+        job.save()
+
+        JobEvent.objects.create(
+            job=job, type=FAILED_EVENT, message='No files supplied')
+
+        send_email_notification(job)
+        return None
+
+    '''
     for file_type in SUBMISSION_TYPES:
         path = os.path.join(base_dir, file_type)
         if not os.path.isdir(path):
@@ -122,6 +148,7 @@ def process_job(job_id, old_url):
 
         send_email_notification(job)
         return None
+    '''
 
     num_attempts = 0
     url = None
@@ -157,27 +184,27 @@ def process_job(job_id, old_url):
                     JobEvent.objects.create(
                         job=job, type=PROCESSING_EVENT, message='MOSS finished processing')
 
-                if is_valid_moss_url(old_url):
-                    url = old_url
-                else:
-                    url = MOSS.generate_url(
-                        user_id=job.user.moss_id,
-                        language=SUPPORTED_LANGUAGES[job.language][1],
-                        **paths,
-                        max_until_ignored=job.max_until_ignored,
-                        max_displayed_matches=job.max_displayed_matches,
-                        use_basename=True,
+                JobEvent.objects.create(
+                    job=job, type=PROCESSING_EVENT, message=paths[FILES_NAME][1])
+                
+                url = MOSS.generate_url(
+                    user_id=job.user.moss_id,
+                    language=SUPPORTED_LANGUAGES[job.language][1],
+                    **paths,
+                    max_until_ignored=job.max_until_ignored,
+                    max_displayed_matches=job.max_displayed_matches,
+                    use_basename=True,
 
-                        # TODO other events to log?
-                        # on_start=None,
-                        # on_connect=None,
+                    # TODO other events to log?
+                    # on_start=None,
+                    # on_connect=None,
 
-                        on_upload_start=on_upload_start,
-                        on_upload_finish=on_upload_finish,
+                    on_upload_start=on_upload_start,
+                    on_upload_finish=on_upload_finish,
 
-                        on_processing_start=on_processing_start,
-                        on_processing_finish=on_processing_finish,
-                    )
+                    on_processing_start=on_processing_start,
+                    on_processing_finish=on_processing_finish,
+                )
 
             msg = f'Started parsing MOSS report: {url}'
             logger.info(msg)
@@ -278,28 +305,32 @@ def process_job(job_id, old_url):
 
         for match in result.matches:
             
+            first_name = match.name_1.split('_')
+            second_name = match.name_2.split('_')
+
+            # Gets the first submission indicated by the match
             first_submission = Submission.objects.filter(
-                job=job, submission_id=match.name_1).first()
+                user=job.user,
+                file_name=first_name[0],
+                assignment=first_name[1],
+                semester=first_name[2],
+            ).first()
+            
+            # Gets the second submission indicated by the match
             second_submission = Submission.objects.filter(
-                job=job, submission_id=match.name_2).first()
+                user=job.user,
+                file_name=second_name[0],
+                assignment=second_name[1],
+                semester=second_name[2],
+            ).first()
 
             # Ensure matching submission is found (avoid future errors)
             if first_submission and second_submission:
-                Match.objects.create(
-                    moss_result=moss_result,
-                    first_submission=first_submission,
-                    second_submission=second_submission,
-                    first_percentage=match.percentage_1,
-                    second_percentage=match.percentage_2,
-                    lines_matched=match.lines_matched,
-                    line_matches=match.line_matches
-                )
-            else:
-                first_submission = Submission.objects.filter(
-                    job=job, name=match.name_1).first()
-                second_submission = Submission.objects.filter(
-                    job=job, name=match.name_2).first()
-                if first_submission and second_submission:
+
+                is_relevant = (first_submission.semester == job.semester) or (second_submission.semester == job.semester)
+
+                # Only make a match if one of the files is from the semester we care about
+                if is_relevant:
                     Match.objects.create(
                         moss_result=moss_result,
                         first_submission=first_submission,
@@ -309,8 +340,8 @@ def process_job(job_id, old_url):
                         lines_matched=match.lines_matched,
                         line_matches=match.line_matches
                     )
-                else:
-                    JobEvent.objects.create(job=job, type=COMPLETED_EVENT,message=f'missing submission for {match.name_1} or {match.name_2}')
+            else:
+                JobEvent.objects.create(job=job, type=COMPLETED_EVENT,message=f'missing submission for {match.name_1} or {match.name_2}')
 
         JobEvent.objects.create(
             job=job, type=COMPLETED_EVENT, message='Completed')
@@ -322,6 +353,7 @@ def process_job(job_id, old_url):
     finally:
         job.save()
 
+        '''
         if DEBUG:
             # Calculate average file_size
             num_files = len(paths[FILES_NAME])
@@ -348,3 +380,4 @@ def process_job(job_id, old_url):
                     log_info['completion_date'] - log_info['start_date']).total_seconds()
                 json.dump(log_info, fp, sort_keys=True, default=str)
                 print(file=fp)
+        '''

@@ -207,6 +207,7 @@ with capture_in(LANGUAGE_CONTEXT):
     SUPPORTED_LANGUAGES = {
         # CODE : (Name, moss_name, [extensions], highlight_name)
         # pyi, pyc, pyd, pyo, pyw, pyz
+        'MB': ('Matlab', 'matlab', ['m'], 'matlab'),
         'PY': ('Python', 'python', ['py'], 'python'),
         'JA': ('Java', 'java', ['java'], 'java'),  # class, jar
         'CP': ('C++', 'cc', ['C', 'cc', 'cpp', 'cxx', 'c++', 'h', 'H', 'hh', 'hpp', 'hxx', 'h++'], 'cpp'),
@@ -215,7 +216,6 @@ with capture_in(LANGUAGE_CONTEXT):
         'JS': ('Javascript', 'javascript', ['js'], 'javascript'),  # cjs, mjs
         'PL': ('Perl', 'perl', ['pl', 'plx', 'pm', 'xs', 't', 'pod'], 'perl'),
         'MP': ('MIPS assembly', 'mips', ['asm', 's'], 'x86asm'),
-        'MB': ('Matlab', 'matlab', ['m'], 'matlab'),
 
         # TODO decide which to add, and add extensions
         # 'LP' : ('Lisp', 'lisp', []),
@@ -291,7 +291,7 @@ JOB_CONTEXT = {}
 with capture_in(JOB_CONTEXT):
     JOB_URL_TEMPLATE = f'{MEDIA_ROOT}/{{user_id}}/{{assignment}}'
     JOB_UPLOAD_TEMPLATE = f'{JOB_URL_TEMPLATE}/uploads'
-    SUBMISSION_UPLOAD_TEMPLATE = f'{JOB_UPLOAD_TEMPLATE}/{{file_type}}/{{semester}}/{{name}}'
+    SUBMISSION_UPLOAD_TEMPLATE = f'{JOB_UPLOAD_TEMPLATE}/{{file_type}}/{{semester}}/{{name}}_{{assignment}}_{{semester}}'
 
     MIN_RETRIES_COUNT = 3
     MIN_RETRY_TIME = 30

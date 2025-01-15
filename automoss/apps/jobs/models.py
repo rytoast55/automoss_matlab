@@ -136,7 +136,7 @@ class Submission(models.Model):
         )
 
         if os.path.exists(media_path):
-            shutil.rmtree(media_path)
+            os.remove(media_path)
 
             parent = os.path.dirname(media_path)
             if len(os.listdir(parent)) == 0:  # Delete parent dir if empty

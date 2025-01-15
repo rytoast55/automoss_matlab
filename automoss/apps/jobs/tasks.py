@@ -311,6 +311,7 @@ def process_job(job_id):
             first_name = match.name_1.split('_')
             second_name = match.name_2.split('_')
 
+            # Gets the first submission indicated by the match
             first_submission = Submission.objects.filter(
                 user=job.user,
                 file_name=first_name[0],
@@ -318,6 +319,7 @@ def process_job(job_id):
                 semester=first_name[2],
             ).first()
             
+            # Gets the second submission indicated by the match
             second_submission = Submission.objects.filter(
                 user=job.user,
                 file_name=second_name[0],
@@ -327,21 +329,11 @@ def process_job(job_id):
 
             # Ensure matching submission is found (avoid future errors)
             if first_submission and second_submission:
-                Match.objects.create(
-                    moss_result=moss_result,
-                    first_submission=first_submission,
-                    second_submission=second_submission,
-                    first_percentage=match.percentage_1,
-                    second_percentage=match.percentage_2,
-                    lines_matched=match.lines_matched,
-                    line_matches=match.line_matches
-                )
-            else:
-                first_submission = Submission.objects.filter(
-                    job=job, name=match.name_1).first()
-                second_submission = Submission.objects.filter(
-                    job=job, name=match.name_2).first()
-                if first_submission and second_submission:
+
+                is_relevant = (first_submission.semester is job.semester) or (second_submission.semester is job.semester)
+
+                # Only make a match if one of the files is from the semester we care about
+                if is_relevant:
                     Match.objects.create(
                         moss_result=moss_result,
                         first_submission=first_submission,
@@ -351,8 +343,8 @@ def process_job(job_id):
                         lines_matched=match.lines_matched,
                         line_matches=match.line_matches
                     )
-                else:
-                    JobEvent.objects.create(job=job, type=COMPLETED_EVENT,message=f'missing submission for {match.name_1} or {match.name_2}')
+            else:
+                JobEvent.objects.create(job=job, type=COMPLETED_EVENT,message=f'missing submission for {match.name_1} or {match.name_2}')
 
         JobEvent.objects.create(
             job=job, type=COMPLETED_EVENT, message='Completed')

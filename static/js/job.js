@@ -21,10 +21,15 @@ class Job extends HTMLTableRowElement{
 		this.append(this.jobName);
 		this.jobName.innerHTML = this.comment;
 		
-		// Language
-		this.jobLanguage = document.createElement('td');
-		this.append(this.jobLanguage);
-		this.jobLanguage.innerHTML = SUPPORTED_LANGUAGES[this.language][0];
+		// Assignment
+		this.jobAssignment = document.createElement('td');
+		this.append(this.jobAssignment);
+		this.jobAssignment.innerHTML = this.assignment;
+
+		// Semester
+		this.jobSemester = document.createElement('td');
+		this.append(this.jobSemester);
+		this.jobSemester.innerHTML = this.semester;
 
 		// Students
 		this.jobNumStudents = document.createElement('td');

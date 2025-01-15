@@ -146,30 +146,45 @@ class New(View):
                 'message': 'Invalid parameter: Max displayed matches'
             }
             return JsonResponse(data, status=400)
+        
+        assignment_name = request.POST.get('job-assignment')
+        if not Submission.objects.filter(user=request.user, assignment=assignment_name).exists():
+            data = {
+                'message': f'No submissions for assignment {assignment_name}'
+            }
+            return JsonResponse(data, status=400)
+        
+        semester = request.POST.get('job-semester')
+        if not Submission.objects.filter(user=request.user, semester=semester).exists():
+            data = {
+                'message': f'No submissions for semester {semester}'
+            }
+            return JsonResponse(data, status=400)
 
         comment = request.POST.get('job-name')
 
-        num_students = len(request.FILES.getlist(FILES_NAME))
+        num_students = len(Submission.objects.filter(user=request.user, assignment=assignment_name))
 
         new_job = Job.objects.create(
             user=request.user,
+            assignment=assignment_name,
+            semester=semester,
             language=language,
             num_students=num_students,
             comment=comment,
             max_until_ignored=max_until_ignored,
-            max_displayed_matches=max_displayed_matches
+            max_displayed_matches=max_displayed_matches,
+
         )
         JobEvent.objects.create(job=new_job, type=CREATED_EVENT,
-                                message=f'Created job for {num_students} students with language=\'{posted_language}\', {max_until_ignored=} and {max_displayed_matches=}')
+                                message=f'Created job for {assignment_name}, filtering for {semester} students')
 
         job_id = new_job.job_id
-
-        
 
         JobEvent.objects.create(
             job=new_job, type=INQUEUE_EVENT, message=f'Placed in the processing queue')
 
-        process_job.delay(job_id, request.POST.get('job-url'))
+        process_job.delay(job_id)
 
         data = json.loads(serialize('json', [new_job]))[0]['fields']
         return JsonResponse(data, status=200, safe=False)

@@ -3,10 +3,12 @@ import os
 import json
 
 from django.contrib.auth.decorators import login_required
+from django.urls import reverse
 from django.utils.decorators import method_decorator
-from django.shortcuts import render
+from django.shortcuts import redirect, render
 from django.template.defaulttags import register
 from django.http.response import JsonResponse
+from django.http import HttpRequest, HttpResponseNotModified, Http404
 from django.core.serializers import serialize
 from django.utils.safestring import mark_safe
 from django.views import View
@@ -318,3 +320,19 @@ class JSONJobEvents(View):
         }
 
         return JsonResponse(data, status=200)
+
+
+def delete_semester(request: HttpRequest):
+
+    if request.method == "GET":
+        raise Http404()
+    
+    else:
+
+        # Delete the files for the given semester
+        semester = request.POST.get("semester")
+
+        for s in Submission.objects.filter(semester=semester):
+            s.delete()
+
+        return redirect(reverse("users:profile"))

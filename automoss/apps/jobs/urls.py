@@ -11,6 +11,7 @@ urlpatterns = [
     path('remove', views.Remove.as_view(), name='remove'),
     path('retry', views.Retry.as_view(), name='retry'),
     path('upload', views.Upload.as_view(), name='upload'),
+    path('delete-semester', views.delete_semester, name='delete'),
 
     # Results
     path('<uuid:job_id>/result/',
